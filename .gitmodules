@@ -1,0 +1,3 @@
+[submodule "diary-frontend"]
+	path = diary-frontend
+	url = git@github.com:Skyseaee/DailyChat-frontend.git
