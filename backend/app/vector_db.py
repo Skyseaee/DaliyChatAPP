@@ -1,10 +1,11 @@
+from datetime import datetime, time
 import uuid
 import chromadb
 from chromadb.utils import embedding_functions
 from flask import Flask
 import requests
 from langchain_openai import ChatOpenAI
-from langchain.chains import RunnableSequence
+from langchain_core.runnables import RunnableSequence
 
 from langchain.chains import LLMChain  # 修改为使用LLMChain
 from langchain.prompts import PromptTemplate
@@ -35,12 +36,20 @@ class HuggingFaceEmbedding:
         self.headers = {"Authorization": f"Bearer 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"}
 
     def __call__(self, input):
-        payload = {
-            "inputs": input,
-            "options": {"wait_for_model": True}
-        }
-        response = requests.post(self.API_URL, headers=self.headers, json=payload)
-        return response.json()
+        retries = 3
+        for i in range(retries):
+            try:
+                payload = {
+                    "inputs": input,
+                    "options": {"wait_for_model": True}
+                }
+                response = requests.post(self.API_URL, headers=self.headers, json=payload)
+                response.raise_for_status()  # 检查请求是否成功
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                print(f"请求失败，重试 {i + 1}/{retries}: {str(e)}")
+                time.sleep(2 ** i)  # 指数退避
+        raise Exception("HuggingFace API 请求失败")
 
 # 获取或创建用户的集合
 def get_user_collection(user_id):
@@ -61,15 +70,20 @@ def enhance_positive_sentiment(text):
 
 def get_latest_conversation_summary(user_id):
     collection = get_user_collection(user_id)
-    results = collection.query(
+    results = collection.get(
         where={"source": "user_conversation"},
-        n_results=10  # 获取更多结果以便排序
     )
+
     if results.get('documents'):
-        # 按照 'timestamp' 排序
-        sorted_docs = sorted(results['documents'], key=lambda x: x.get('timestamp', 0), reverse=True)
-        return sorted_docs[0]
+        # 按时间戳排序
+        sorted_docs = sorted(
+            zip(results['documents'], results['metadatas']),
+            key=lambda x: x[1].get('timestamp', ''),
+            reverse=True
+        )
+        return sorted_docs[0][0]  # 返回最新的文档
     return ""
+
 
 
 def summarize_conversation(user_id, conversation):
@@ -104,13 +118,11 @@ def summarize_conversation(user_id, conversation):
         """
     )
 
-    # 构建处理链，使用 RunnableSequence 替代 LLMChain
-    chain = prompt_template | llm  # 使用管道操作符（|）来连接 prompt_template 和 llm
+    chain = prompt_template | llm  
 
     try:
         # 获取最新对话摘要
         latest_summary = get_latest_conversation_summary(user_id)
-        
         # 调用链处理对话
         response = chain.invoke({
             "latest_summary": latest_summary,
@@ -118,7 +130,10 @@ def summarize_conversation(user_id, conversation):
         })
         
         # 处理响应格式（不同版本可能返回不同结构）
-        summary_text = response.get("text", response.get("result", str(response)))
+        if isinstance(response, dict):
+            summary_text = response.get("text", response.get("result", str(response)))
+        else:
+            summary_text = str(response)
         
         # 增强积极情感
         return enhance_positive_sentiment(summary_text.strip())
@@ -127,6 +142,7 @@ def summarize_conversation(user_id, conversation):
         # 捕获异常并返回原始对话内容
         print(f"对话摘要生成失败: {str(e)}")
         return enhance_positive_sentiment(conversation)  # 降级处理
+    
 # 向集合中添加对话记录
 def add_conversation(user_id, conversation):
     collection = get_user_collection(user_id)
@@ -134,18 +150,25 @@ def add_conversation(user_id, conversation):
     summarized_conversation = summarize_conversation(user_id, conversation)
     collection.add(
         documents=[summarized_conversation],
-        metadatas=[{"source": "user_conversation"}],
+        metadatas=[{"source": "user_conversation", "timestamp": datetime.now().isoformat()}],
         ids=[str(uuid.uuid4())]  # 使用 uuid 生成唯一 id
     )
 
 # 获取用户所有对话记录（这里假设能获取到当天所有对话）
 def get_all_conversations(user_id):
     collection = get_user_collection(user_id)
-    results = collection.query(
-        where={"source": "user_conversation"},
-        n_results=1000
+    results = collection.get(
+        where={"source": "user_conversation"}
     )
-    return " ".join(results.get('documents', []))
+    if results.get('documents'):
+        # 按时间戳排序
+        sorted_docs = sorted(
+            zip(results['documents'], results['metadatas']),
+            key=lambda x: x[1].get('timestamp', ''),
+            reverse=True
+        )
+        return " ".join([doc[0] for doc in sorted_docs])
+    return ""
 
 # 仅作为测试 huggingface_embedding 函数用
 if __name__ == '__main__':
