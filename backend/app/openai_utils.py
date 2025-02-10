@@ -1,51 +1,78 @@
 import openai
-from chatAI.backend.config import Config
+from app import app
+
+OPENAI_API_KEY = app.config['OPENAI_API_KEY']
 
 # Define templates for different personalities
 TEMPLATES = {
-    "friendly": """
-    You are a friendly and helpful assistant. Please respond to the following user input in a conversational and polite manner:
+    "友好风格": """
+    你是一位亲切友好且乐于助人的助手。请以亲切自然、礼貌的对话方式回应以下用户的输入：
 
     User: {user_input}
 
-    Assistant:
+    Assistant: 您好呀，我来为您好好解答啦。
     """,
-    "formal": """
-    You are a formal and professional assistant. Please respond to the following user input in a respectful and precise manner:
+    "正式风格": """
+    你是一位正式且专业的助手。请以恭敬、严谨、准确的态度回应以下用户的输入：
 
-    User: {user_input}
+    用户：{user_input}
 
-    Assistant:
+    助手：尊敬的用户，针对您提出的问题，以下是详细且专业的回复。
     """,
-    "humorous": """
-    You are a humorous and witty assistant. Please respond to the following user input with a touch of humor and light-heartedness:
+    "幽默风格": """
+    你是一位幽默风趣、机智俏皮的助手。请带着轻松愉快的幽默感回应以下用户的输入：
 
-    User: {user_input}
+    用户：{user_input}
 
-    Assistant:
+    助手：嘿呀，听您这话呀，就像给我出了个超有趣的小谜题呢，且看我逗趣地给您解一解！
     """,
-    "empathetic": """
-    You are an empathetic and understanding assistant. Please respond to the following user input with empathy and support:
+    "共情风格": """
+    你是一位善解人意、富有同理心的助手。请带着理解和支持回应以下用户的输入：
 
-    User: {user_input}
+    用户：{user_input}
 
-    Assistant:
+    助手：我完全能体会到您此刻的感受，别着急，咱们一起想办法来解决。
     """
 }
 
-def generate_summary(prompt, personality="friendly"):
-    openai.api_key = Config.OPENAI_API_KEY
-    
+def generate_summary(prompt, personality: str="友好风格", stream: bool=False):
+    # 直接设置 OpenAI API Key
+    openai.api_key = OPENAI_API_KEY 
+
+    client = openai.OpenAI(api_key=openai.api_key, base_url="https://api.deepseek.com")
+
     # Select the appropriate template based on the personality type
-    template = TEMPLATES.get(personality, TEMPLATES["friendly"])
+    template = TEMPLATES.get(personality, TEMPLATES["友好风格"])
     
     # Format the prompt using the selected template
     formatted_prompt = template.format(user_input=prompt)
     
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+    response = client.chat.completions.create(
+        model="deepseek-chat",
         messages=[
+            {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": formatted_prompt}
-        ]
+        ],
+        stream=stream,
     )
     return response
+
+def seek_chat_service(prompt, stream: bool=False):
+    openai.api_key = OPENAI_API_KEY 
+
+    client = openai.OpenAI(api_key=openai.api_key, base_url="https://api.deepseek.com")
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant"},
+            {"role": "user", "content": prompt}
+        ],
+        stream=stream,
+    )
+    return response
+
+# Example usage
+if __name__ == "__main__":
+    prompt = "你好，今天天气怎么样？"
+    response = generate_summary(prompt, personality="友好风格")
+    print(response.choices[0].message.content)

@@ -5,8 +5,8 @@ from app.vector_db import get_all_conversations, add_conversation
 from app.openai_utils import generate_summary
 import jwt
 from datetime import datetime, timedelta
-from chatAI.backend.config import Config
 
+SECRET_KEY = app.config['SECRET_KEY']
 
 # 用户注册路由
 @app.route('/register', methods=['POST'])
@@ -44,7 +44,7 @@ def login():
     token = jwt.encode({
         'user_id': user.user_id,
         'exp': datetime.utcnow() + timedelta(minutes=30)
-    }, Config.SECRET_KEY)
+    }, SECRET_KEY)
 
     return jsonify({'token': token})
 
@@ -58,7 +58,7 @@ def conversation():
     token = token.replace('Bearer ', '')
 
     try:
-        data = jwt.decode(token, Config.SECRET_KEY, algorithms=['HS256'])
+        data = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
         user_id = data['user_id']
     except jwt.ExpiredSignatureError:
         return jsonify({"error": "Token has expired"}), 401
@@ -88,7 +88,7 @@ def generate_daily_summary():
     token = token.replace('Bearer ', '')
 
     try:
-        data = jwt.decode(token, Config.SECRET_KEY, algorithms=['HS256'])
+        data = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
         user_id = data['user_id']
     except jwt.ExpiredSignatureError:
         return jsonify({"error": "Token has expired"}), 401
@@ -119,7 +119,7 @@ def generate_monthly_summary():
     token = token.replace('Bearer ', '')
 
     try:
-        data = jwt.decode(token, Config.SECRET_KEY, algorithms=['HS256'])
+        data = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
         user_id = data['user_id']
     except jwt.ExpiredSignatureError:
         return jsonify({"error": "Token has expired"}), 401
@@ -156,7 +156,7 @@ def get_diary():
     token = token.replace('Bearer ', '')
 
     try:
-        data = jwt.decode(token, Config.SECRET_KEY, algorithms=['HS256'])
+        data = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
         user_id = data['user_id']
     except jwt.ExpiredSignatureError:
         return jsonify({"error": "Token has expired"}), 401
