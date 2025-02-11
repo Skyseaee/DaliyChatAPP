@@ -35,41 +35,45 @@ TEMPLATES = {
     """
 }
 
-def generate_summary(prompt, personality: str="友好风格", stream: bool=False):
-    # 直接设置 OpenAI API Key
-    openai.api_key = OPENAI_API_KEY 
-
-    client = openai.OpenAI(api_key=openai.api_key, base_url="https://api.deepseek.com")
-
-    # Select the appropriate template based on the personality type
+def generate_summary_stream(prompt, personality: str = "友好风格"):
+    """处理流式响应的函数"""
+    client = openai.OpenAI(api_key=OPENAI_API_KEY, base_url="https://api.deepseek.com")
     template = TEMPLATES.get(personality, TEMPLATES["友好风格"])
-    
-    # Format the prompt using the selected template
     formatted_prompt = template.format(user_input=prompt)
-    
+
     response = client.chat.completions.create(
         model="deepseek-chat",
         messages=[
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": formatted_prompt}
         ],
-        stream=stream,
+        stream=True,  # 启用流式响应
     )
-    print(response, stream)
-    if stream:
-        # 如果是流式响应，逐步返回每个数据块
-        result = ""
-        for part in response:
-            # 如果流式响应中有数据
-            if 'choices' in part and len(part['choices']) > 0:
-                choice = part['choices'][0]
-                if 'delta' in choice and 'content' in choice['delta']:
-                    result += choice['delta']['content']
-                    # 这里你可以按需返回中间结果或处理内容
-                    yield result  # 使用生成器返回中间状态
-        return result
-    else:
-        return response
+
+    result = ""
+    for part in response:
+        if hasattr(part, 'choices') and len(part.choices) > 0:
+            choice = part.choices[0]
+            if hasattr(choice, 'delta') and hasattr(choice.delta, 'content'):
+                result += choice.delta.content
+                yield result  # 使用生成器返回中间状态
+
+def generate_summary(prompt, personality: str = "友好风格"):
+    """处理非流式响应的函数"""
+    client = openai.OpenAI(api_key=OPENAI_API_KEY, base_url="https://api.deepseek.com")
+    template = TEMPLATES.get(personality, TEMPLATES["友好风格"])
+    formatted_prompt = template.format(user_input=prompt)
+
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant"},
+            {"role": "user", "content": formatted_prompt}
+        ],
+        stream=False,  # 禁用流式响应
+    )
+
+    return response
 
 def seek_chat_service(prompt, stream: bool=False):
     openai.api_key = OPENAI_API_KEY 

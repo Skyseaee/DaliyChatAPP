@@ -1,3 +1,4 @@
+from typing import Generator
 from flask import Response, request, jsonify, make_response
 from app import app, db
 from app.models import DailyDiaryEntry, User, MonthlyDiaryEntry
@@ -73,15 +74,19 @@ def login():
 @app.route('/conversation', methods=['POST'])
 @token_required
 def conversation(user_id):
+
     user_input = request.json.get('input')
     if not user_input:
         return jsonify({"error": "No input provided"}), 400
 
     response = generate_summary(user_input)
-    bot_response = response.choices[0].message.content
-    add_conversation(user_id, user_input + " " + bot_response)
 
-    return jsonify({"response": bot_response})
+    if isinstance(response, Generator):  # 如果是生成器（stream=True）
+        return jsonify({"error": "Unexpected stream response"}), 500
+    else:  # 如果是普通响应（stream=False）
+        bot_response = response.choices[0].message.content
+        add_conversation(user_id, user_input + " " + bot_response)
+        return jsonify({"response": bot_response})
 
 # @app.route('/conversation', methods=['POST'])
 # def conversation():
