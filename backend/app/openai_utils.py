@@ -55,7 +55,21 @@ def generate_summary(prompt, personality: str="友好风格", stream: bool=False
         ],
         stream=stream,
     )
-    return response
+    print(response, stream)
+    if stream:
+        # 如果是流式响应，逐步返回每个数据块
+        result = ""
+        for part in response:
+            # 如果流式响应中有数据
+            if 'choices' in part and len(part['choices']) > 0:
+                choice = part['choices'][0]
+                if 'delta' in choice and 'content' in choice['delta']:
+                    result += choice['delta']['content']
+                    # 这里你可以按需返回中间结果或处理内容
+                    yield result  # 使用生成器返回中间状态
+        return result
+    else:
+        return response
 
 def seek_chat_service(prompt, stream: bool=False):
     openai.api_key = OPENAI_API_KEY 
