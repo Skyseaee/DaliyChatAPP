@@ -99,11 +99,13 @@ def conversation():
     
     try:
         response = generate_summary(data['input'])
-        if not response or 'choices' not in response:
-            return handle_error("Failed to generate response", 500)
+        user_id = data['user_id']
+        # if not response or 'choices' not in response:
+        #     return handle_error("Failed to generate response", 500)
             
         bot_response = response.choices[0].message.content
-        add_conversation(request.user.user_id, f"Q: {data['input']} A: {bot_response}")
+        
+        add_conversation(user_id, f"Q: {data['input']} A: {bot_response}")
         
         return jsonify({
             "success": True,
