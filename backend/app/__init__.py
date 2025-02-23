@@ -11,7 +11,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 # flask insert-test-data
-@app.cli.command("insert-test-data")
+# @app.cli.command("insert-test-data")
 @with_appcontext
 def insert_test_data():
     """Insert test data into the database."""
@@ -82,7 +82,7 @@ from app import models
 # Create tables if they don't exist
 with app.app_context():
     db.create_all()
-    insert_test_data()
+    # insert_test_data()
 
 from app.scheduler import scheduler
 
